@@ -1,0 +1,53 @@
+name: Build, Test and Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test-coverage:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ros_distribution: [humble]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup ROS2
+        uses: ros-tooling/setup-ros@v0.6
+        with:
+          required-ros-distributions: ${{ matrix.ros_distribution }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-colcon-common-extensions lcov
+          sudo rosdep update
+          rosdep install --from-paths src --ignore-src -r -y
+
+      - name: Build and test with coverage
+        run: |
+          source /opt/ros/${{ matrix.ros_distribution }}/setup.bash
+          cd /home/runner/work/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)
+          colcon build --symlink-install --cmake-args -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_C_FLAGS="--coverage"
+          colcon test
+          colcon test-result --verbose
+
+      - name: Generate coverage report
+        run: |
+          cd /home/runner/work/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)
+          lcov --capture --directory build --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '/opt/*' '*/build/*' '*/install/*' '*/test/*' --output-file coverage.info
+          lcov --list coverage.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: /home/runner/work/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)/coverage.info
+          name: codecov-umbrella
+          fail_ci_if_error: false
+          verbose: true
