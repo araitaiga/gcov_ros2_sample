@@ -26,20 +26,21 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-colcon-common-extensions lcov
-          sudo rosdep update
+          sudo rosdep init
+          rosdep update
           rosdep install --from-paths src --ignore-src -r -y
 
       - name: Build and test with coverage
         run: |
           source /opt/ros/${{ matrix.ros_distribution }}/setup.bash
-          cd /home/runner/work/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)
+          cd /home/runner/work/${GITHUB_REPOSITORY#*/}/${GITHUB_REPOSITORY#*/}
           colcon build --symlink-install --cmake-args -DCMAKE_CXX_FLAGS="--coverage" -DCMAKE_C_FLAGS="--coverage"
           colcon test
           colcon test-result --verbose
 
       - name: Generate coverage report
         run: |
-          cd /home/runner/work/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)/$(echo $GITHUB_REPOSITORY | cut -d / -f 2)
+          cd /home/runner/work/${GITHUB_REPOSITORY#*/}/${GITHUB_REPOSITORY#*/}
           lcov --capture --directory build --output-file coverage.info
           lcov --remove coverage.info '/usr/*' '/opt/*' '*/build/*' '*/install/*' '*/test/*' --output-file coverage.info
           lcov --list coverage.info
